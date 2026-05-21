@@ -657,11 +657,15 @@ const Logic = {
 
   cleanAcrossStreetAddressPairName(value){
     let text = String(value || '').trim();
+    if(!text) return '';
+
     text = text.replace(/acroos/gi,'across');
     text = text.replace(/\s+and\s+across\s+street\s+at\s+/gi,' and across street from ');
     text = text.replace(/\s+and\s+across\s+the\s+street\s+at\s+/gi,' and across street from ');
+    text = text.replace(/\s+from\s+to\s+/gi,' from ');
     text = text.replace(/\s+at\s+to\s+/gi,' to ');
     text = text.replace(/\s+/g,' ').trim();
+
     return text;
   },
 
@@ -784,6 +788,16 @@ const Logic = {
     const city = val('city') || '';
     const state = 'TX';
     const text = this.cleanLocationName(location);
+
+    // Across-street address pair, e.g.
+    // "3745 Birmington and across street at 3748 Birmington"
+    let pair = text.match(/(\d{3,6})\s+([A-Za-z ]+?)\s+and\s+across\s+(?:the\s+)?street\s+(?:at|from)\s+(\d{3,6})\s+([A-Za-z ]+)/i);
+    if(pair){
+      return {
+        start:`${pair[1]} ${pair[2].trim()}, ${city}, ${state}`,
+        end:`${pair[3]} ${pair[4].trim()}, ${city}, ${state}`
+      };
+    }
 
     let m = text.match(/(\d{3,6})\s*[-–]\s*(\d{3,6})\s+([A-Za-z ]+)/i);
     if(m) return { start:`${m[1]} ${m[3].trim()}, ${city}, ${state}`, end:`${m[2]} ${m[3].trim()}, ${city}, ${state}` };
@@ -1150,7 +1164,7 @@ const Packet = {
       return 'GPS POINT: ' + item.gpsStart + '\nNOTE: This is a point-style GPS reference. For roadway frontage locates, enter both START and END GPS points.';
     }
 
-    return 'GPS needs review.';
+    return 'GPS needs review. Generate GPS coordinates or manually enter START and END GPS points before submission.';
   },
 
   buildZone(zone,items){
@@ -1655,6 +1669,16 @@ window.autoAssignZones = autoAssignZones;
 window.addManualRow = addManualRow;
 window.downloadCsv = downloadCsv;
 window.handlePdfUpload = handlePdfUpload;
+
+/* ============================================================
+   Console debug helpers
+   ============================================================ */
+window.kkeDebug = {
+  getLocations: () => App.locations,
+  generateAll: () => Packet.all(),
+  runCheck: () => UI.runCheck(),
+  parseSample: () => { setVal('estimateText',SAMPLE_TEXT); Parser.parse(); return App.locations; }
+};
 
 /* ============================================================
    Event listeners

@@ -1,0 +1,1735 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KKE Locate Builder - Stable Architecture</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .monospace-font { font-family: 'Fira Code', Consolas, monospace; }
+    #map { height: 500px; z-index: 10; }
+    .tab-active { border-color:#0057a8; color:#0057a8; background-color:#f0f7ff; }
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:#f1f5f9; }
+    ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:4px; }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            kke: {
+              blue: '#0057a8',
+              darkBlue: '#003f7d',
+              lightBlue: '#eaf4ff',
+              hoverBlue: '#004b93'
+            }
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+<header class="bg-gradient-to-r from-[#003f7d] via-[#0057a8] to-[#0b66c2] text-white shadow-lg border-b-4 border-blue-200">
+  <div class="max-w-[1550px] mx-auto px-4 py-5 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+    <div class="flex items-center gap-3">
+      <div class="bg-white text-kke-blue p-2.5 rounded-xl shadow-md flex items-center justify-center">
+        <i class="fa-solid fa-map-location-dot text-2xl"></i>
+      </div>
+      <div>
+        <h1 class="text-2xl font-black tracking-tight flex items-center gap-2">
+          KKE Locate Builder <span class="text-xs font-semibold bg-blue-500/30 text-blue-100 px-2 py-0.5 rounded-full border border-blue-400/20">Stable v3.0</span>
+        </h1>
+        <p class="text-blue-100 text-xs sm:text-sm font-medium mt-0.5">
+          Texas811 Locate Packet Builder • Parser • GPS Support • Map Review
+        </p>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2 sm:gap-4 items-center bg-white/10 p-2 rounded-2xl border border-white/10 backdrop-blur-sm text-xs">
+      <div class="px-3 py-1 bg-white/5 rounded-lg border border-white/5">
+        <span class="text-blue-200 font-medium block">Total Locations</span>
+        <span id="statCount" class="text-lg font-bold">0</span>
+      </div>
+      <div class="px-3 py-1 bg-white/5 rounded-lg border border-white/5">
+        <span class="text-blue-200 font-medium block">Zones Organized</span>
+        <span id="statZones" class="text-lg font-bold">0</span>
+      </div>
+      <div class="px-3 py-1 bg-white/5 rounded-lg border border-white/5">
+        <span class="text-blue-200 font-medium block">GPS Verified</span>
+        <span id="statGps" class="text-lg font-bold">0 / 0</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+  <div class="max-w-[1550px] mx-auto px-4">
+    <nav class="flex space-x-1 py-2" aria-label="Tabs">
+      <button id="tabBtn1" data-tab="1" class="tab-active flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border-b-2 border-transparent hover:text-kke-blue transition-all">
+        <i class="fa-solid fa-file-import text-base"></i> Setup & Intake
+      </button>
+      <button id="tabBtn2" data-tab="2" class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border-b-2 border-transparent hover:text-kke-blue transition-all">
+        <i class="fa-solid fa-earth-americas text-base"></i> Map Workspace
+      </button>
+      <button id="tabBtn3" data-tab="3" class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border-b-2 border-transparent hover:text-kke-blue transition-all">
+        <i class="fa-solid fa-file-invoice text-base"></i> Locate Packet
+      </button>
+      <button id="tabBtn4" data-tab="4" class="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border-b-2 border-transparent hover:text-kke-blue transition-all">
+        <i class="fa-solid fa-sliders-h text-base"></i> Options & Diagnostics
+      </button>
+    </nav>
+  </div>
+</div>
+
+<div id="toastContainer" class="fixed top-24 right-6 z-[1000] flex flex-col gap-2 pointer-events-none"></div>
+
+<main class="flex-grow max-w-[1550px] w-full mx-auto p-4 lg:p-6">
+
+<section id="tabContent1" class="space-y-6">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+      <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2">
+        <i class="fa-solid fa-clipboard-check text-kke-blue"></i> 1. Texas811 Project Setup
+      </h2>
+      <span class="text-xs text-slate-500 font-medium">Used in all generated locate requests</span>
+    </div>
+    <div class="p-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div><label for="projectName" class="block text-xs font-bold text-slate-600 mb-1">Project Name</label><input id="projectName" type="text" class="input-base" value="Tribute Water Ponding"></div>
+        <div><label for="city" class="block text-xs font-bold text-slate-600 mb-1">City</label><input id="city" type="text" class="input-base" value="The Colony"></div>
+        <div><label for="county" class="block text-xs font-bold text-slate-600 mb-1">County</label><input id="county" type="text" class="input-base" value="Denton"></div>
+        <div><label for="poNumber" class="block text-xs font-bold text-slate-600 mb-1">PO / Reference ID</label><input id="poNumber" type="text" class="input-base" value="26-05721"></div>
+        <div><label for="ticketType" class="block text-xs font-bold text-slate-600 mb-1">Ticket Type</label><select id="ticketType" class="input-base bg-white"><option>Normal</option><option>Update</option><option>Remark</option><option>Emergency</option></select></div>
+        <div><label for="natureOfWork" class="block text-xs font-bold text-slate-600 mb-1">Nature of Work</label><select id="natureOfWork" class="input-base bg-white"><option>Road/Street-Repair</option><option>Concrete lifting and stabilization</option><option>Polyurethane concrete stabilization</option><option>Roadway maintenance</option></select></div>
+        <div><label for="workDoneFor" class="block text-xs font-bold text-slate-600 mb-1">Work Done For</label><input id="workDoneFor" type="text" class="input-base" value="The City of The Colony"></div>
+        <div><label for="duration" class="block text-xs font-bold text-slate-600 mb-1">Work Duration</label><input id="duration" type="text" class="input-base" value="1-2 days per locate zone"></div>
+        <div><label for="explosives" class="block text-xs font-bold text-slate-600 mb-1">Explosives Used</label><select id="explosives" class="input-base bg-white"><option>No</option><option>Yes</option></select></div>
+        <div><label for="whiteLined" class="block text-xs font-bold text-slate-600 mb-1">White Lined</label><select id="whiteLined" class="input-base bg-white"><option>No</option><option>Yes</option><option>Not required / map provided</option></select></div>
+        <div><label for="directionalDrilling" class="block text-xs font-bold text-slate-600 mb-1">Directional Drilling</label><select id="directionalDrilling" class="input-base bg-white"><option>No</option><option>Yes</option></select></div>
+        <div><label for="deeperThan16" class="block text-xs font-bold text-slate-600 mb-1">Deeper Than 16 Inches</label><select id="deeperThan16" class="input-base bg-white"><option>Yes - DI may reach approx. 4 ft</option><option>No</option><option>Varies by location</option></select></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-7 flex flex-col">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2">
+          <i class="fa-solid fa-file-invoice-dollar text-kke-blue"></i> 2. Estimate Text & PDF Intake
+        </h2>
+        <label for="pdfUpload" class="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold py-1.5 px-3 rounded-lg flex items-center gap-1.5 transition-colors">
+          <i class="fa-solid fa-file-pdf text-red-600"></i> Upload Estimate PDF
+          <input id="pdfUpload" type="file" accept="application/pdf" class="hidden">
+        </label>
+      </div>
+      <div class="p-6 flex-grow flex flex-col space-y-4">
+        <p class="text-xs text-slate-500">
+          Paste estimate text or upload a PDF. The parser extracts one locate area per physical estimate heading.
+        </p>
+        <textarea id="estimateText" placeholder="Paste estimate details here..." class="w-full flex-grow min-h-[250px] border border-slate-300 rounded-xl p-3 text-sm monospace-font focus:border-kke-blue focus:ring-1 focus:ring-kke-blue outline-none resize-y"></textarea>
+        <div class="flex flex-wrap gap-2 pt-2">
+          <button id="extractBtn" class="btn-primary"><i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Parse & Extract</button>
+          <button id="sampleBtn" class="btn-secondary"><i class="fa-solid fa-database"></i> Load Sample Estimate</button>
+          <button id="clearBtn" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold py-2.5 px-4 rounded-xl transition-all ml-auto flex items-center gap-1.5"><i class="fa-solid fa-trash-can"></i> Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-5 flex flex-col">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-circle-info text-kke-blue"></i> Workflow Rules</h2>
+      </div>
+      <div class="p-6 space-y-4 text-sm flex-grow">
+        <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-2">
+          <span class="font-bold text-slate-700 block">Stable Business Logic</span>
+          <ul class="space-y-1.5 text-slate-600 list-disc list-inside">
+            <li>Same exact Method/DI heading merges into one locate.</li>
+            <li>Separated addresses remain separate locate areas.</li>
+            <li>Intersection locates use one center GPS and 100 ft each direction.</li>
+            <li>Address/frontage locates require start/end GPS endpoints.</li>
+            <li>Normal start/end GPS gets road offset + 20 ft buffer.</li>
+          </ul>
+        </div>
+        <div class="pt-4 border-t border-slate-100 mt-auto flex flex-wrap gap-2">
+          <button id="saveBtn" class="flex-1 bg-teal-50 hover:bg-teal-100 text-teal-700 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-teal-200/50 flex items-center justify-center gap-1"><i class="fa-solid fa-floppy-disk"></i> Save Progress</button>
+          <button id="loadBtn" class="flex-1 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold py-2.5 px-3 rounded-xl transition-all border border-sky-200/50 flex items-center justify-center gap-1"><i class="fa-solid fa-folder-open"></i> Load Last Progress</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tabContent2" class="space-y-6 hidden">
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-map-location text-kke-blue"></i> Interactive Map Workspace</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Drag start/end markers to set roadway or frontage GPS points.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button id="mockGpsBtn" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition-all flex items-center gap-1.5"><i class="fa-solid fa-circle-nodes"></i> Mock Demo Coordinates</button>
+        <button id="gpsBtn" class="btn-primary"><i class="fa-solid fa-location-crosshairs"></i> Google API Geocode</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-12">
+      <div class="lg:col-span-8 border-b lg:border-b-0 lg:border-r border-slate-200 relative">
+        <div id="map" class="w-full"></div>
+      </div>
+      <div class="lg:col-span-4 bg-slate-50 flex flex-col">
+        <div class="p-4 border-b border-slate-200 bg-white">
+          <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Location Manager</h3>
+          <div class="flex items-center gap-2">
+            <button id="manualBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-3 rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5"><i class="fa-solid fa-plus text-emerald-500"></i> Add Manually</button>
+            <button id="zoneBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold py-2 px-3 rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5"><i class="fa-solid fa-tags text-blue-500"></i> Auto Zones</button>
+          </div>
+        </div>
+        <div id="activeLocationList" class="flex-grow p-4 overflow-y-auto max-h-[390px] space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+      <div>
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-table-list text-kke-blue"></i> Extracted Location Grid</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Edit directly. Changes immediately update packets and map.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button id="intersectionBtn" class="btn-secondary"><i class="fa-solid fa-road-spikes"></i> Auto-Intersections</button>
+        <button id="csvBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition-all flex items-center gap-1"><i class="fa-solid fa-file-csv"></i> Download CSV</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left border-collapse">
+        <thead>
+          <tr class="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
+            <th class="p-3 w-32">Zone</th>
+            <th class="p-3 w-48">Work Location</th>
+            <th class="p-3 w-40">Intersection</th>
+            <th class="p-3 w-40">Start Address</th>
+            <th class="p-3 w-40">End Address</th>
+            <th class="p-3 w-24">LF</th>
+            <th class="p-3 w-32">Side</th>
+            <th class="p-3 w-28">Road Offset</th>
+            <th class="p-3 w-36">GPS Start / Center</th>
+            <th class="p-3 w-36">GPS End</th>
+            <th class="p-3 w-28">Status</th>
+            <th class="p-3 w-16 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody id="locationsTableBody" class="divide-y divide-slate-200 text-xs">
+          <tr><td colspan="12" class="text-center py-8 text-slate-400 italic">No locations configured yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="tabContent3" class="space-y-6 hidden">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-4 flex flex-col">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4">
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-gears text-kke-blue"></i> Packet Generator</h2>
+      </div>
+      <div class="p-6 space-y-4 flex-grow">
+        <div>
+          <label for="zoneSelect" class="block text-xs font-bold text-slate-600 mb-1">Select Work Zone</label>
+          <select id="zoneSelect" class="input-base bg-white"><option value="">(No Zones Extracted)</option></select>
+        </div>
+        <div class="pt-4 border-t border-slate-100 space-y-2">
+          <button id="genSelectedBtn" class="w-full btn-primary justify-center"><i class="fa-solid fa-file-lines"></i> Generate Selected Zone</button>
+          <button id="genAllBtn" class="w-full btn-secondary justify-center"><i class="fa-solid fa-file-shield"></i> Generate All Zones</button>
+        </div>
+        <div class="p-3.5 bg-blue-50/50 border border-blue-100 rounded-xl text-[11px] text-slate-600 space-y-1">
+          <span class="font-bold text-kke-darkBlue block flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> Guardrails</span>
+          <p class="leading-relaxed">Output keeps pricing/internal estimate data out. GPS goes in Supporting GPS / Additional Info style.</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden lg:col-span-8 flex flex-col">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-file-invoice text-kke-blue"></i> Generated Texas811 Locate Packet</h2>
+        <button id="copyBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg shadow-sm transition-all flex items-center gap-1.5"><i class="fa-solid fa-copy"></i> Copy Packet Text</button>
+      </div>
+      <div class="p-6 flex-grow flex flex-col space-y-4">
+        <div id="copyStatus" class="text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-500 font-medium">No locate text generated yet.</div>
+        <div id="locatePreview" class="monospace-font text-[11px] sm:text-xs text-slate-300 bg-slate-900 border border-slate-800 rounded-xl p-4 min-h-[300px] overflow-auto whitespace-pre-wrap flex-grow shadow-inner">Generated locate text will appear here.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="tabContent4" class="space-y-6 hidden">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4"><h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-sliders text-kke-blue"></i> Route & Projection Settings</h2></div>
+      <div class="p-6 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label for="locateBuffer" class="block text-xs font-bold text-slate-600 mb-1">Locate Buffer (ft)</label><input id="locateBuffer" type="number" class="input-base" value="20" min="0"><span class="text-[10px] text-slate-400">Extends start/end limits.</span></div>
+          <div><label for="nearestMajorRoad" class="block text-xs font-bold text-slate-600 mb-1">Default Driving Start Road</label><input id="nearestMajorRoad" type="text" class="input-base" value="Main Street"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+          <div><label for="defaultOffsetSide" class="block text-xs font-bold text-slate-600 mb-1">Default Road Offset Side</label><select id="defaultOffsetSide" class="input-base bg-white"><option value="right">Right Side Offset</option><option value="left">Left Side Offset</option><option value="none">No Road Offset</option></select></div>
+          <div><label for="roadOffsetFeet" class="block text-xs font-bold text-slate-600 mb-1">Road Offset Distance (ft)</label><input id="roadOffsetFeet" type="number" class="input-base" value="45" min="0"></div>
+        </div>
+        <div class="pt-2 border-t border-slate-100"><label for="googleApiKey" class="block text-xs font-bold text-slate-600 mb-1">Google Maps API Key</label><input id="googleApiKey" type="password" class="input-base monospace-font" placeholder="AIzaSy..."></div>
+        <div class="pt-2 border-t border-slate-100"><label for="defaultLane" class="block text-xs font-bold text-slate-600 mb-1">Default Locate Area Description</label><textarea id="defaultLane" rows="2" class="input-base text-xs resize-none">roadway panels, curb line, adjacent sidewalk, and right-of-way areas within the described limits</textarea></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div class="bg-slate-50 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <h2 class="text-base font-bold text-kke-darkBlue flex items-center gap-2"><i class="fa-solid fa-shield-virus text-kke-blue"></i> Diagnostics</h2>
+        <button id="appCheckBtn" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg transition-all flex items-center gap-1"><i class="fa-solid fa-circle-check"></i> Run Verification</button>
+      </div>
+      <div class="p-6 flex-grow flex flex-col space-y-4">
+        <div><label for="globalDirections" class="block text-xs font-bold text-slate-600 mb-1">Default Driving Directions Starter</label><textarea id="globalDirections" class="input-base text-xs resize-y min-h-[70px]">From the nearest major roadway, travel to the listed work street/intersection. Locate limits are defined by GPS coordinates below.</textarea></div>
+        <div class="flex-grow flex flex-col space-y-2"><label class="block text-xs font-bold text-slate-600">GPS Diagnostic Logs</label><div id="gpsDebug" class="monospace-font text-[10px] text-slate-300 bg-slate-900 rounded-xl p-3 flex-grow min-h-[140px] max-h-[220px] overflow-y-auto whitespace-pre-wrap">No GPS logs yet.</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="bg-slate-900 border-t border-slate-800 text-slate-400 py-6 text-center text-xs mt-auto">
+  <div class="max-w-[1550px] mx-auto px-4 space-y-2">
+    <p>KKE Locate Builder — Stable Architecture v3.0</p>
+    <p class="text-[10px] text-slate-600">&copy; 2026 KKE Concrete Stabilization Solutions Inc.</p>
+  </div>
+</footer>
+
+<style>
+  .input-base { width:100%; border:1px solid #cbd5e1; border-radius:0.75rem; padding:0.5rem 0.75rem; font-size:0.875rem; outline:none; }
+  .input-base:focus { border-color:#0057a8; box-shadow:0 0 0 1px #0057a8; }
+  .btn-primary { background:#0057a8; color:white; font-size:0.75rem; font-weight:700; padding:0.625rem 1rem; border-radius:0.75rem; box-shadow:0 4px 10px rgba(0,87,168,.2); display:inline-flex; align-items:center; gap:.375rem; transition:all .15s ease; }
+  .btn-primary:hover { background:#004b93; }
+  .btn-secondary { background:#f1f5f9; color:#334155; font-size:0.75rem; font-weight:700; padding:0.625rem 1rem; border-radius:0.75rem; display:inline-flex; align-items:center; gap:.375rem; transition:all .15s ease; }
+  .btn-secondary:hover { background:#e2e8f0; }
+</style>
+
+<script>
+'use strict';
+
+/* ============================================================
+   KKE Locate Builder Stable Architecture v3.0
+   One state object. One parser. One GPS engine. One packet engine.
+   ============================================================ */
+
+const App = {
+  locations: [],
+  generatedLocateText: '',
+  googleMapsLoadPromise: null,
+  map: null,
+  mapLayers: {
+    markers: [],
+    polylines: [],
+    circles: []
+  }
+};
+
+window.App = App;
+
+const SAMPLE_TEXT = `Lifting & Leveling Job Location-8353-8337 Burnley and across the Street Holding water (METHOD INJECTION ONLY)
+There are 4 total areas that will be worked. The first is at 8349 Burnley. The second area is at 8341 Burnley. The third area is across the street from 8349 Burnley. The fourth location is a mismatched joint that runs across the road.
+Deep Injection Job Location-8353-8337 Burnley and across the Street Holding water (DI INJECTION ONLY)
+There are 4 total areas that will be worked. The first is at 8349 Burnley. The second area is at 8341 Burnley. The third area is across the street from 8349 Burnley. The fourth location is a mismatched joint that runs across the road.
+Lifting & Leveling Job Location-2920 Prescott (METHOD INJECTION ONLY)
+This location is 65'x8' with a settlement of 2 1/4" and there is water ponding at the curb line.
+Deep Injection Job Location-2920 Prescott (DI INJECTION ONLY)
+This location is 65'x8' with a settlement of 2 1/4" and there is water ponding at the curb line.
+Lifting & Leveling Job Location-8155 Wakefield through 8163 Wakefield (METHOD INJECTION ONLY)
+This location has two areas that need to be worked that are holding water. 30'x8' and 65'x8'.
+Deep Injection Job Location-8155 Wakefield through 8163 Wakefield (DI INJECTION ONLY)
+This location has two areas that need to be worked that are holding water. 30'x8' and 65'x8'.
+Lifting & Leveling Job Location Broughton at Telford (METHOD INJECTION ONLY)
+This location is 45'x6'.
+Deep Injection Job Location- Broughton at Telford (DI INJECTION ONLY)
+This location is 45'x6'.
+Lifting & Leveling Job Location 3421 Kirkfield (METHOD INJECTION ONLY)
+This location is 40'x6''.
+Deep Injection Job Location- 3421 Kirkfield (DI INJECTION ONLY)
+This location is 40'x6''.
+Lifting & Leveling Job Location 8237 Bonny Bank (METHOD INJECTION ONLY)
+This location is 75'x9'.
+Deep Injection Job Location- 8237 Bonny Bank (DI INJECTION ONLY)
+This location is 75'x9'.
+Lifting & Leveling Job Location- Bonny Bank at Lindsay Gardens (METHOD INJECTION ONLY)
+This location has 3 separate work areas. Bonny Bank at Lindsay Gardens 48'x25', ADA 80'x25', sidewalk 75'x15'.
+Deep Injection Job Location- Bonny Bank at Lindsay Gardens (DI INJECTION ONLY)
+This location has 3 separate work areas.
+Lifting & Leveling Job Location-Prescott at Burnley (METHOD INJECTION ONLY)
+This location has two areas that need to be lifted. The first location is 30'x15'. The second area is 50'x6'.
+Deep Injection Job Location-Prescott at Burnley (DI INJECTION ONLY)
+This location has two areas that need to be lifted.
+Lifting & Leveling Job Location-Prescott at Wembley (METHOD INJECTION ONLY)
+This location has three areas that need to be lifted. Between 3036 Prescott and 8361 Wembley and across street. There is a dip across the entire road that needs to be lifted.
+Deep Injection Job Location-Prescott at Wembley (DI INJECTION ONLY)
+This location has three areas that need to be lifted. Between 3036 Prescott and 8361 Wembley and across street.
+Lifting & Leveling Job Location-3745 Birmington and acroos street at 3748 Birmington (METHOD INJECTION ONLY)
+This location has three areas that need to be lifted.
+Deep Injection Job Location-3745 Birmington and acroos street at 3748 Birmington (DI INJECTION ONLY)
+This location has three areas that need to be lifted.
+Lifting & Leveling Job Location-2921 Darcy (METHOD INJECTION ONLY)
+This location has two areas that need to be worked. 20'x9' and 100'x9'.
+Deep Injection Job Location-2921 Darcy (DI INJECTION ONLY)
+This location has two areas that need to be worked.
+This quote is for Tribute Water Ponding PO#26-05721`;
+
+function el(id){ return document.getElementById(id); }
+function val(id){ const node = el(id); return node ? node.value : ''; }
+function setVal(id,value){ const node = el(id); if(node) node.value = value; }
+function normalize(value){ return String(value || '').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function escapeHtml(value){
+  return String(value || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+function showToast(message,type='info'){
+  const container = el('toastContainer');
+  if(!container) return;
+  const toast = document.createElement('div');
+  const color = type === 'success' ? 'emerald' : type === 'warning' ? 'amber' : type === 'error' ? 'rose' : 'blue';
+  toast.className = `p-4 rounded-xl shadow-lg border bg-white text-xs font-bold flex items-center gap-2.5 transition-all duration-300 translate-x-12 opacity-0 pointer-events-auto max-w-sm border-${color}-100 text-slate-800`;
+  toast.innerHTML = `<i class="fa-solid fa-circle-info text-${color}-500"></i><div class="flex-grow">${escapeHtml(message)}</div><button class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>`;
+  toast.querySelector('button').addEventListener('click',()=>toast.remove());
+  container.appendChild(toast);
+  setTimeout(()=>toast.classList.remove('translate-x-12','opacity-0'),10);
+  setTimeout(()=>{ toast.classList.add('translate-x-12','opacity-0'); setTimeout(()=>toast.remove(),300); },4500);
+}
+
+function setCopyStatus(message){
+  const box = el('copyStatus');
+  if(box) box.textContent = message;
+}
+
+function updateLocatePreview(){
+  const box = el('locatePreview');
+  if(box) box.textContent = App.generatedLocateText || 'Generated locate text will appear here.';
+}
+
+function gpsLog(message){
+  const box = el('gpsDebug');
+  if(!box) return;
+  if(box.textContent === 'No GPS logs yet.') box.textContent = '';
+  box.textContent += '[' + new Date().toLocaleTimeString() + '] ' + message + '\n';
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearGpsLog(){
+  const box = el('gpsDebug');
+  if(box) box.textContent = '';
+}
+
+/* ============================================================
+   Tab / UI module
+   ============================================================ */
+
+function switchTab(tabId){
+  for(let i=1;i<=4;i++){
+    const button = el('tabBtn'+i);
+    const content = el('tabContent'+i);
+    if(!button || !content) continue;
+    if(i === tabId){
+      button.classList.add('tab-active');
+      content.classList.remove('hidden');
+    }else{
+      button.classList.remove('tab-active');
+      content.classList.add('hidden');
+    }
+  }
+  if(tabId === 2){
+    setTimeout(()=>MapModule.init(),50);
+  }
+}
+
+/* ============================================================
+   Parser module
+   ============================================================ */
+
+const Parser = {
+  extractProjectSetup(text){
+    const source = String(text || '').replace(/\s+/g,' ').trim();
+    const lower = source.toLowerCase();
+    if(!source) return;
+
+    const poIndex = lower.indexOf('po#');
+    if(poIndex > -1){
+      const poText = source.slice(poIndex + 3, poIndex + 25).trim().split(' ')[0];
+      if(poText) setVal('poNumber', poText);
+    }
+
+    const quoteIndex = lower.indexOf('this quote is for');
+    if(quoteIndex > -1){
+      let projectText = source.slice(quoteIndex + 17, quoteIndex + 90).trim();
+      const poCut = projectText.toLowerCase().indexOf('po#');
+      if(poCut > -1) projectText = projectText.slice(0,poCut).trim();
+      if(projectText) setVal('projectName', projectText);
+    }
+
+    if(lower.includes('the colony') && lower.includes('texas')){
+      setVal('city','The Colony');
+      setVal('county','Denton');
+      setVal('workDoneFor','The City of The Colony');
+    }
+  },
+
+  splitEntries(text){
+    const source = String(text || '').replace(/\s+/g,' ').trim();
+    const entries = [];
+    const marker = 'Job Location';
+    let searchIndex = 0;
+
+    while(true){
+      const start = source.indexOf(marker, searchIndex);
+      if(start === -1) break;
+
+      const next = source.indexOf(marker, start + marker.length);
+      const block = source.slice(start, next === -1 ? source.length : next).trim();
+      searchIndex = next === -1 ? source.length : next;
+
+      let locationText = block.slice(marker.length).trim();
+      if(locationText.startsWith('-')) locationText = locationText.slice(1).trim();
+
+      const cuts = [
+        locationText.toLowerCase().indexOf('(method injection only)'),
+        locationText.toLowerCase().indexOf('(di injection only)'),
+        locationText.toLowerCase().indexOf('(method'),
+        locationText.toLowerCase().indexOf('(di ')
+      ].filter(x => x > -1);
+
+      if(cuts.length) locationText = locationText.slice(0, Math.min(...cuts)).trim();
+
+      locationText = Logic.cleanLocationName(locationText);
+      if(locationText) entries.push({ locationText, fullText:block });
+    }
+
+    return entries;
+  },
+
+  parse(){
+    const text = val('estimateText');
+    if(!text.trim()){
+      showToast('Please paste or upload estimate text first.','warning');
+      return;
+    }
+
+    this.extractProjectSetup(text);
+    const entries = this.splitEntries(text);
+    const found = [];
+
+    entries.forEach((entry,index)=>{
+      const method = /DI INJECTION ONLY|Deep Injection/i.test(entry.fullText) ? 'DI' : 'Method';
+      const name = Logic.cleanLocationName(entry.locationText);
+      if(!name) return;
+
+      const existing = found.find(x => normalize(x.location) === normalize(name));
+      const context = entry.fullText;
+      const coords = Logic.extractCoordinates(context);
+
+      if(existing){
+        if(!existing.methodTypes.includes(method)) existing.methodTypes.push(method);
+        existing.dimensions = Logic.uniqueText(existing.dimensions, Logic.extractDimensions(context));
+        existing.notes = Logic.uniqueText(existing.notes, Logic.extractNotes(context));
+        if(!existing.gpsStart && coords[0]) existing.gpsStart = coords[0];
+        if(!existing.gpsEnd && coords[1]) existing.gpsEnd = coords[1];
+        return;
+      }
+
+      const parsed = Logic.deriveStartEndFromLocation(name);
+
+      found.push({
+        id: String(Date.now()) + '-' + index,
+        zone:'',
+        location:name,
+        county:val('county'),
+        methodTypes:[method],
+        dimensions:Logic.extractDimensions(context),
+        notes:Logic.extractNotes(context),
+        nearestIntersection:Logic.guessIntersection(name),
+        driveFrom:Logic.guessIntersection(name),
+        driveFromGps:'',
+        distanceToBeginFeet:'',
+        routeDirections:'',
+        startPoint:parsed.start,
+        endPoint:parsed.end,
+        direction:Logic.inferDirectionFromText(name),
+        linearFeet:Logic.estimateLfFromDimensions(Logic.extractDimensions(context)),
+        locateWidth:'15 ft each side of work area',
+        sideOfRoad:/across/i.test(context) ? 'Across Street' : 'Both Sides',
+        gpsStart:coords[0] || '',
+        gpsEnd:coords[1] || '',
+        roadOffsetSide:val('defaultOffsetSide') || 'right',
+        status:'Draft'
+      });
+    });
+
+    App.locations = found;
+    Logic.autoAssignZones(false);
+    UI.renderAll();
+    App.generatedLocateText = '';
+    updateLocatePreview();
+
+    if(App.locations.length){
+      showToast('Extracted '+App.locations.length+' work location(s).','success');
+      switchTab(2);
+    }else{
+      showToast('No Job Location entries found.','error');
+    }
+  }
+};
+
+/* ============================================================
+   Business logic / math module
+   ============================================================ */
+
+const Logic = {
+  cleanLocationName(raw){
+    let text = String(raw || '');
+    text = text.replace(/\(METHOD INJECTION ONLY\)/gi,'');
+    text = text.replace(/\(DI INJECTION ONLY\)/gi,'');
+    text = text.replace(/METHOD INJECTION ONLY/gi,'');
+    text = text.replace(/DI INJECTION ONLY/gi,'');
+    text = text.replace(/Deep Injection/gi,'');
+    text = text.replace(/Lifting & Leveling/gi,'');
+    text = text.replace(/acroos/gi,'across');
+    text = this.stripAfterBadPhrase(text);
+    text = text.replace(/and across the Street Holding water/gi,'');
+    text = text.replace(/and across the street holding water/gi,'');
+    text = text.replace(/Holding water/gi,'');
+    text = text.replace(/\s+/g,' ');
+    return text.replace(/^[-\s]+/,'').trim();
+  },
+
+  stripAfterBadPhrase(value){
+    let text = String(value || '');
+    const badPhrases = [' This location',' There are',' KKE will',' Once the concrete',' with a settlement',' and there is water',' There is a dip',' needs to be lifted',' need to be lifted'];
+    const lower = text.toLowerCase();
+    let cut = -1;
+    badPhrases.forEach(phrase=>{
+      const index = lower.indexOf(phrase.toLowerCase());
+      if(index > -1 && (cut === -1 || index < cut)) cut = index;
+    });
+    return cut > -1 ? text.slice(0,cut).trim() : text.trim();
+  },
+
+  uniqueText(a,b){
+    const parts = [...(a || '').split(', '), ...(b || '').split(', ')].map(x=>x.trim()).filter(Boolean);
+    return [...new Set(parts)].join(', ');
+  },
+
+  extractDimensions(text){
+    const matches = String(text || '').match(/\b\d+\s*x\s*\d+'?/gi) || [];
+    return [...new Set(matches.map(x=>x.replace(/\s+/g,'').replace(/x/i,'x')))].join(', ');
+  },
+
+  extractCoordinates(text){
+    const matches = String(text || '').match(/-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}/g) || [];
+    return [...new Set(matches.map(x=>x.replace(/\s+/g,'')))];
+  },
+
+  extractNotes(text){
+    const notes = [];
+    if(/holding water|ponding/i.test(text)) notes.push('ponding');
+    if(/ADA/i.test(text)) notes.push('ADA');
+    if(/across street|across the street/i.test(text)) notes.push('across street');
+    if(/mismatched joint/i.test(text)) notes.push('mismatched joint');
+    if(/entire road|dip across/i.test(text)) notes.push('roadway dip');
+    return notes.join(', ');
+  },
+
+  cleanAcrossStreetAddressPairName(value){
+    let text = String(value || '').trim();
+    text = text.replace(/acroos/gi,'across');
+    text = text.replace(/\s+and\s+across\s+street\s+at\s+/gi,' and across street from ');
+    text = text.replace(/\s+and\s+across\s+the\s+street\s+at\s+/gi,' and across street from ');
+    text = text.replace(/\s+at\s+to\s+/gi,' to ');
+    text = text.replace(/\s+/g,' ').trim();
+    return text;
+  },
+
+  stripCityState(value){
+    let text = String(value || '').trim();
+    text = text.replace(/,\s*The Colony,\s*TX/gi,'');
+    text = text.replace(/,\s*TX/gi,'');
+    text = text.replace(/\s+/g,' ');
+    return text.trim();
+  },
+
+  formatWorkAreaName(item){
+    const start = this.stripCityState(String(item.startPoint || ''));
+    const end = this.stripCityState(String(item.endPoint || ''));
+    const location = this.stripCityState(this.cleanLocationName(item.location || ''));
+
+    if(start && end && start !== end) return start + ' to ' + end;
+    return start || location;
+  },
+
+  isAddressLike(value){
+    const text = String(value || '').trim();
+    if(/\b\d{3,6}\s*[-–]\s*\d{3,6}\s+[A-Za-z]/.test(text)) return true;
+    if(/\b\d{3,6}\s+[A-Za-z]/.test(text)) return true;
+    return false;
+  },
+
+  isAcrossStreetAddressPair(value){
+    const text = String(value || '').toLowerCase();
+    const hasAcross = text.includes('across street') || text.includes('across the street');
+    const numbers = text.match(/\b\d{3,6}\b/g) || [];
+    if(hasAcross && numbers.length >= 2) return true;
+    if(/\b\d{3,6}\b[^&]*\bat\b[^&]*\b\d{3,6}\b/i.test(value)) return true;
+    return false;
+  },
+
+  hasTwoStreetNamesWithoutHouseNumbers(value){
+    const text = String(value || '').trim();
+    const numbers = text.match(/\b\d{3,6}\b/g) || [];
+    if(numbers.length >= 2) return false;
+    const normalized = text.replace(/\s+and\s+/gi,' & ').replace(/\s+at\s+/gi,' & ');
+    if(!normalized.includes('&')) return false;
+    const parts = normalized.split('&').map(x=>x.trim()).filter(Boolean);
+    if(parts.length < 2) return false;
+    return parts.slice(0,2).every(part=>!/^\d{3,6}\s+/.test(part));
+  },
+
+  isIntersectionLocate(item){
+    const location = String(item.location || '');
+    const intersection = String(item.nearestIntersection || '');
+    if(this.isAcrossStreetAddressPair(location) || this.isAcrossStreetAddressPair(intersection)) return false;
+    if(this.hasTwoStreetNamesWithoutHouseNumbers(location)) return true;
+    if(this.hasTwoStreetNamesWithoutHouseNumbers(intersection)) return true;
+    return false;
+  },
+
+  getIntersectionStreetNames(item){
+    let source = this.normalizeIntersectionForUse(item.nearestIntersection || '') || item.location || '';
+    source = String(source).replace(/\s+at\s+/gi,' & ').replace(/\s+and\s+/gi,' & ').replace(/\s+/g,' ').trim();
+    if(!source.includes('&')) return [];
+    return source.split('&').map(x=>x.trim()).filter(Boolean).slice(0,2);
+  },
+
+  isUsableIntersection(value){
+    const text = String(value || '').trim().toLowerCase();
+    if(!text) return false;
+    if(text.includes('this location') || text.includes('there are') || text.includes('across street') || text.includes('holding water')) return false;
+    if(/\d{3,6}\s*[-–]\s*\d{3,6}/.test(text)) return false;
+    return text.includes('&') || text.includes(' and ') || text.includes(' at ');
+  },
+
+  simplifyIntersectionText(value){
+    let text = String(value || '').trim();
+    if(!text) return '';
+
+    const parts = text.split(';').map(x=>x.trim()).filter(Boolean);
+    if(parts.length){
+      const hit = parts.find(part=>this.isUsableIntersection(part));
+      text = hit || parts[0];
+    }
+
+    text = text.replace(/,\s*[A-Za-z .'-]+,\s*TX\s*\d{5}/gi,'');
+    text = text.replace(/,\s*TX\s*\d{5}/gi,'');
+    text = text.replace(/,\s*USA/gi,'');
+    text = this.stripAfterBadPhrase(text);
+    text = text.replace(/and across street/gi,'');
+    text = text.replace(/and across the street/gi,'');
+    return text.replace(/\s+/g,' ').trim();
+  },
+
+  normalizeIntersectionForUse(value){
+    let text = this.simplifyIntersectionText(value);
+    if(!text) return '';
+    if(this.isAcrossStreetAddressPair(text)) return '';
+    if(!this.isUsableIntersection(text)) return '';
+
+    text = text.replace(/\s+and\s+/gi,' & ').replace(/\s+at\s+/gi,' & ').replace(/\s*&\s*/g,' & ');
+    return text.replace(/\s+/g,' ').trim();
+  },
+
+  guessIntersection(location){
+    const clean = this.simplifyIntersectionText(this.cleanLocationName(location));
+    const lower = clean.toLowerCase();
+
+    if(lower.includes('burnley') && lower.includes('prescott')) return 'Burnley & Prescott';
+    if(lower.includes('prescott') && lower.includes('wembley')) return 'Prescott & Wembley';
+    if(lower.includes('bonny bank') && lower.includes('lindsay')) return 'Bonny Bank & Lindsay Gardens';
+    if(lower.includes('broughton') && lower.includes('telford')) return 'Broughton & Telford';
+
+    if(lower.includes(' at ')){
+      const parts = clean.split(/ at /i);
+      if(parts.length >= 2) return this.simplifyIntersectionText(parts[0].trim() + ' & ' + parts[1].trim());
+    }
+
+    if(this.isUsableIntersection(clean)) return this.simplifyIntersectionText(clean);
+    return '';
+  },
+
+  deriveStartEndFromLocation(location){
+    const city = val('city') || '';
+    const state = 'TX';
+    const text = this.cleanLocationName(location);
+
+    let m = text.match(/(\d{3,6})\s*[-–]\s*(\d{3,6})\s+([A-Za-z ]+)/i);
+    if(m) return { start:`${m[1]} ${m[3].trim()}, ${city}, ${state}`, end:`${m[2]} ${m[3].trim()}, ${city}, ${state}` };
+
+    m = text.match(/(\d{3,6})\s+([A-Za-z ]+)\s+through\s+(\d{3,6})\s+([A-Za-z ]+)/i);
+    if(m) return { start:`${m[1]} ${m[2].trim()}, ${city}, ${state}`, end:`${m[3]} ${m[4].trim()}, ${city}, ${state}` };
+
+    m = text.match(/(\d{3,6})\s+([A-Za-z ]+).*?(\d{3,6})\s+([A-Za-z ]+)/i);
+    if(m) return { start:`${m[1]} ${m[2].trim()}, ${city}, ${state}`, end:`${m[3]} ${m[4].trim()}, ${city}, ${state}` };
+
+    m = text.match(/(\d{3,6})\s+([A-Za-z ]+)/);
+    if(m){
+      const addr = `${m[1]} ${m[2].trim()}, ${city}, ${state}`;
+      return { start:addr, end:addr };
+    }
+
+    const intersection = this.guessIntersection(text);
+    if(intersection) return { start:`${intersection}, ${city}, ${state}`, end:`${intersection}, ${city}, ${state}` };
+
+    return { start:text ? `${text}, ${city}, ${state}` : '', end:text ? `${text}, ${city}, ${state}` : '' };
+  },
+
+  inferDirectionFromText(text){
+    const lower = String(text || '').toLowerCase();
+    if(lower.includes('east')) return 'east';
+    if(lower.includes('west')) return 'west';
+    if(lower.includes('north')) return 'north';
+    if(lower.includes('south')) return 'south';
+    return '';
+  },
+
+  estimateLfFromDimensions(dimensions){
+    if(!dimensions) return '';
+    const matches = [...String(dimensions).matchAll(/(\d+)\s*x\s*(\d+)/gi)];
+    if(!matches.length) return '';
+    return String(matches.reduce((sum,m)=>sum + Math.max(parseInt(m[1],10),parseInt(m[2],10)),0));
+  },
+
+  parseLatLng(value){
+    const parts = String(value || '').split(',').map(x=>parseFloat(x.trim()));
+    if(parts.length !== 2 || Number.isNaN(parts[0]) || Number.isNaN(parts[1])) return null;
+    return { lat:parts[0], lng:parts[1] };
+  },
+
+  formatLatLng(point){ return point.lat.toFixed(6) + ',' + point.lng.toFixed(6); },
+  toRad(deg){ return deg * Math.PI / 180; },
+  toDeg(rad){ return rad * 180 / Math.PI; },
+
+  bearingDegrees(a,b){
+    const lat1 = this.toRad(a.lat);
+    const lat2 = this.toRad(b.lat);
+    const dLng = this.toRad(b.lng - a.lng);
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1)*Math.sin(lat2) - Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);
+    return (this.toDeg(Math.atan2(y,x)) + 360) % 360;
+  },
+
+  offsetPoint(point,bearing,feet){
+    const meters = feet * 0.3048;
+    const earth = 6378137;
+    const angular = meters / earth;
+    const br = this.toRad(bearing);
+    const lat1 = this.toRad(point.lat);
+    const lng1 = this.toRad(point.lng);
+
+    const lat2 = Math.asin(Math.sin(lat1)*Math.cos(angular) + Math.cos(lat1)*Math.sin(angular)*Math.cos(br));
+    const lng2 = lng1 + Math.atan2(Math.sin(br)*Math.sin(angular)*Math.cos(lat1), Math.cos(angular)-Math.sin(lat1)*Math.sin(lat2));
+
+    return { lat:this.toDeg(lat2), lng:this.toDeg(lng2) };
+  },
+
+  distanceFeet(a,b){
+    const start = this.parseLatLng(a);
+    const end = this.parseLatLng(b);
+    if(!start || !end) return '';
+    const R = 6371000;
+    const dLat = this.toRad(end.lat - start.lat);
+    const dLng = this.toRad(end.lng - start.lng);
+    const x = Math.sin(dLat/2)**2 + Math.cos(this.toRad(start.lat))*Math.cos(this.toRad(end.lat))*Math.sin(dLng/2)**2;
+    return Math.round(R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x)) * 3.28084);
+  },
+
+  bufferedGps(startGps,endGps,bufferFeet){
+    const start = this.parseLatLng(startGps);
+    const end = this.parseLatLng(endGps);
+    if(!start || !end || !bufferFeet) return { start:startGps, end:endGps, ok:false };
+    if(Math.abs(start.lat-end.lat) < 0.000001 && Math.abs(start.lng-end.lng) < 0.000001) return { start:startGps, end:endGps, ok:false };
+
+    const bearing = this.bearingDegrees(start,end);
+    const newStart = this.offsetPoint(start,(bearing + 180) % 360,bufferFeet);
+    const newEnd = this.offsetPoint(end,bearing,bufferFeet);
+
+    return { start:this.formatLatLng(newStart), end:this.formatLatLng(newEnd), ok:true };
+  },
+
+  isSingleAddressLocate(item){
+    const location = String(item.location || '');
+    const start = String(item.startPoint || '');
+    const end = String(item.endPoint || '');
+    if(!this.isAddressLike(location) && !this.isAddressLike(start)) return false;
+    if(start && end && normalize(start) !== normalize(end)) return false;
+    return true;
+  },
+
+  hasDifferentStartEndGps(item){
+    const start = this.parseLatLng(item.gpsStart || '');
+    const end = this.parseLatLng(item.gpsEnd || '');
+    if(!start || !end) return false;
+    const feet = this.distanceFeet(item.gpsStart,item.gpsEnd);
+    return feet && feet > 10;
+  },
+
+  needsPropertyEndpointReview(item){
+    return this.isSingleAddressLocate(item) && !this.hasDifferentStartEndGps(item);
+  },
+
+  shouldApplyRoadOffset(item){
+    if(this.isIntersectionLocate(item)) return false;
+    if((item.roadOffsetSide || 'right') === 'none') return false;
+    if(!item.gpsStart || !item.gpsEnd) return false;
+    if(!this.hasDifferentStartEndGps(item)) return false;
+    return true;
+  },
+
+  getRoadOffsetFeet(){
+    const n = parseInt(val('roadOffsetFeet') || '45',10);
+    return n && n > 0 ? n : 0;
+  },
+
+  buildRoadAdjustedBufferedGps(item,bufferFeet){
+    const start = this.parseLatLng(item.gpsStart || '');
+    const end = this.parseLatLng(item.gpsEnd || '');
+
+    if(!start || !end) return { start:item.gpsStart || '', end:item.gpsEnd || '', roadOffsetApplied:false, bufferApplied:false };
+
+    if(!this.shouldApplyRoadOffset(item)){
+      const buffered = this.bufferedGps(item.gpsStart,item.gpsEnd,bufferFeet);
+      return { start:buffered.start, end:buffered.end, roadOffsetApplied:false, bufferApplied:!!buffered.ok };
+    }
+
+    const offsetFeet = this.getRoadOffsetFeet();
+    if(!offsetFeet){
+      const buffered = this.bufferedGps(item.gpsStart,item.gpsEnd,bufferFeet);
+      return { start:buffered.start, end:buffered.end, roadOffsetApplied:false, bufferApplied:!!buffered.ok };
+    }
+
+    const lineBearing = this.bearingDegrees(start,end);
+    const side = item.roadOffsetSide || val('defaultOffsetSide') || 'right';
+    const offsetBearing = side === 'left' ? (lineBearing + 270) % 360 : (lineBearing + 90) % 360;
+
+    const roadStart = this.offsetPoint(start,offsetBearing,offsetFeet);
+    const roadEnd = this.offsetPoint(end,offsetBearing,offsetFeet);
+
+    const roadStartText = this.formatLatLng(roadStart);
+    const roadEndText = this.formatLatLng(roadEnd);
+    const buffered = this.bufferedGps(roadStartText,roadEndText,bufferFeet);
+
+    return {
+      start:buffered.start,
+      end:buffered.end,
+      roadOffsetApplied:true,
+      roadOffsetFeet:offsetFeet,
+      roadOffsetSide:side,
+      bufferApplied:!!buffered.ok
+    };
+  },
+
+  autoAssignZones(render=true){
+    App.locations = App.locations.map(item=>{
+      const l = String(item.location || '').toLowerCase();
+      let zone = 'Zone D - Other Work Areas';
+      if(l.includes('burnley') || l.includes('prescott') || l.includes('wembley')) zone = 'Zone A - Burnley / Prescott / Wembley';
+      if(l.includes('bonny bank') || l.includes('lindsay')) zone = 'Zone B - Bonny Bank / Lindsay Gardens';
+      if(l.includes('wakefield') || l.includes('darcy')) zone = 'Zone C - Wakefield / Darcy';
+      if(l.includes('broughton') || l.includes('telford') || l.includes('kirkfield') || l.includes('birmington')) zone = 'Zone D - Broughton / Kirkfield / Birmington';
+      return { ...item, zone };
+    });
+
+    if(render) UI.renderAll();
+  }
+};
+
+/* ============================================================
+   GPS module
+   ============================================================ */
+
+const GPS = {
+  async loadGoogleMaps(key){
+    if(window.google && window.google.maps && window.google.maps.Geocoder) return Promise.resolve();
+    if(App.googleMapsLoadPromise) return App.googleMapsLoadPromise;
+
+    App.googleMapsLoadPromise = new Promise((resolve,reject)=>{
+      const callback = 'initKkeMaps_' + Date.now();
+      window[callback] = ()=>{ delete window[callback]; resolve(); };
+      const script = document.createElement('script');
+      script.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&callback=' + callback;
+      script.async = true;
+      script.defer = true;
+      script.onerror = ()=>reject(new Error('Google Maps failed to load'));
+      document.head.appendChild(script);
+    });
+
+    return App.googleMapsLoadPromise;
+  },
+
+  geocodeAddress(address,geocoder){
+    return new Promise(resolve=>{
+      if(!address){ resolve(''); return; }
+      gpsLog('Geocoding: ' + address);
+      geocoder.geocode({ address }, (results,status)=>{
+        gpsLog('Google status: ' + status);
+        if(status !== 'OK' || !results || !results.length){ resolve(''); return; }
+        const loc = results[0].geometry.location;
+        resolve(loc.lat().toFixed(6) + ',' + loc.lng().toFixed(6));
+      });
+    });
+  },
+
+  reverseIntersection(latLngText,geocoder){
+    return new Promise(resolve=>{
+      const point = Logic.parseLatLng(latLngText);
+      if(!point){ resolve(''); return; }
+
+      geocoder.geocode({ location:{ lat:point.lat, lng:point.lng } }, (results,status)=>{
+        if(status !== 'OK' || !results || !results.length){ resolve(''); return; }
+
+        for(const result of results){
+          if(result.types && result.types.includes('intersection')){
+            resolve(Logic.normalizeIntersectionForUse(result.formatted_address || ''));
+            return;
+          }
+        }
+        resolve('');
+      });
+    });
+  },
+
+  async generateAll(){
+    clearGpsLog();
+    const key = val('googleApiKey').trim();
+    if(!key){ showToast('Paste Google Maps API key first.','warning'); return; }
+
+    try{
+      gpsLog('Loading Google Maps...');
+      await this.loadGoogleMaps(key);
+    }catch(error){
+      gpsLog(error.message);
+      showToast('Google Maps failed to load.','error');
+      return;
+    }
+
+    const geocoder = new google.maps.Geocoder();
+
+    for(let i=0;i<App.locations.length;i++){
+      const item = App.locations[i];
+
+      if(!item.gpsStart && item.startPoint){
+        item.gpsStart = await this.geocodeAddress(item.startPoint,geocoder);
+      }
+
+      if(Logic.isIntersectionLocate(item)){
+        item.gpsEnd = '';
+      }else if(!item.gpsEnd && item.endPoint){
+        item.gpsEnd = await this.geocodeAddress(item.endPoint,geocoder);
+
+        if(Logic.isSingleAddressLocate(item) && item.gpsStart && item.gpsEnd && normalize(item.gpsStart) === normalize(item.gpsEnd)){
+          item.gpsEnd = '';
+        }
+      }
+
+      if(item.gpsStart && !Logic.normalizeIntersectionForUse(item.nearestIntersection || '')){
+        const guessed = await this.reverseIntersection(item.gpsStart,geocoder);
+        if(guessed) item.nearestIntersection = guessed;
+      }
+    }
+
+    UI.renderAll();
+    MapModule.draw();
+    showToast('GPS generation complete. Review endpoint positions on the map.','success');
+  },
+
+  mock(){
+    const baseLat = 33.1184;
+    const baseLng = -96.9180;
+
+    App.locations.forEach((item,index)=>{
+      const offset = index * 0.0022;
+
+      if(Logic.isIntersectionLocate(item)){
+        item.gpsStart = (baseLat - offset).toFixed(6) + ',' + (baseLng + offset).toFixed(6);
+        item.gpsEnd = '';
+        return;
+      }
+
+      item.gpsStart = (baseLat - offset).toFixed(6) + ',' + (baseLng + offset).toFixed(6);
+
+      if(!Logic.isSingleAddressLocate(item) || normalize(item.startPoint) !== normalize(item.endPoint)){
+        item.gpsEnd = (baseLat - offset - 0.00055).toFixed(6) + ',' + (baseLng + offset + 0.00035).toFixed(6);
+      }
+    });
+
+    UI.renderAll();
+    MapModule.draw();
+    showToast('Mock GPS coordinates generated for testing.','success');
+  }
+};
+
+/* ============================================================
+   Packet generator module
+   ============================================================ */
+
+const Packet = {
+  buildIntersectionInstructions(item){
+    const streets = Logic.getIntersectionStreetNames(item);
+    const distance = 100;
+
+    if(streets.length >= 2){
+      return 'Need all utilities located at the intersection of ' + streets[0] + ' and ' + streets[1] + '. ' +
+        'Locate ' + streets[0] + ' for approximately ' + distance + ' ft north and ' + distance + ' ft south from the center of the intersection. ' +
+        'Locate ' + streets[1] + ' for approximately ' + distance + ' ft east and ' + distance + ' ft west from the center of the intersection. ' +
+        'Also locate roadway panels, curb line, sidewalk, and adjacent right-of-way within those limits. ' +
+        'We will be injecting polyurethane foam beneath the roadway to level and stabilize concrete.';
+    }
+
+    return 'Need all utilities located at the listed intersection. Locate approximately ' + distance + ' ft in each direction from the center GPS point. Also locate roadway panels, curb line, sidewalk, and adjacent right-of-way within those limits. We will be injecting polyurethane foam beneath the roadway to level and stabilize concrete.';
+  },
+
+  buildIntersectionGpsText(item){
+    const centerGps = item.gpsStart || '';
+    const streets = Logic.getIntersectionStreetNames(item);
+    const distance = 100;
+
+    if(!centerGps){
+      return 'CENTER GPS: NEEDS REVIEW\nNOTE: Intersection locates require one GPS point placed in the center of the intersection. Locate 100 ft in each direction from that center point.';
+    }
+
+    if(streets.length >= 2){
+      return 'CENTER GPS: ' + centerGps + '\nLOCATE LIMITS: ' + distance + ' ft north and ' + distance + ' ft south on ' + streets[0] + '. ' + distance + ' ft east and ' + distance + ' ft west on ' + streets[1] + '.';
+    }
+
+    return 'CENTER GPS: ' + centerGps + '\nLOCATE LIMITS: ' + distance + ' ft in every direction from the center of the intersection.';
+  },
+
+  buildNormalGpsText(item,bufferFeet){
+    if(Logic.needsPropertyEndpointReview(item)){
+      return 'START GPS: NEEDS PROPERTY FRONTAGE START POINT\n' +
+        'END GPS: NEEDS PROPERTY FRONTAGE END POINT\n' +
+        'NOTE: Address locates require two GPS endpoints: one at the start of the property/work frontage and one at the end. Enter both endpoints, then regenerate.';
+    }
+
+    if(item.gpsStart && item.gpsEnd && item.gpsStart !== item.gpsEnd){
+      const adjusted = Logic.buildRoadAdjustedBufferedGps(item,bufferFeet);
+      let text = 'START GPS: ' + adjusted.start + '\nEND GPS: ' + adjusted.end;
+
+      if(adjusted.roadOffsetApplied){
+        text += '\nNOTE: GPS was shifted approximately ' + adjusted.roadOffsetFeet + ' ft toward the roadway using "' + adjusted.roadOffsetSide + '" road-offset setting, then extended ' + bufferFeet + ' ft before and after the work limits.';
+      }else if(adjusted.bufferApplied){
+        text += '\nNOTE: GPS includes ' + bufferFeet + ' ft buffer before and after the work limits.';
+      }
+      return text;
+    }
+
+    if(item.gpsStart){
+      return 'GPS POINT: ' + item.gpsStart + '\nNOTE: This is a point-style GPS reference. For roadway frontage locates, enter both START and END GPS points.';
+    }
+
+    return 'GPS needs review.';
+  },
+
+  buildZone(zone,items){
+    const city = val('city');
+    const county = val('county');
+    const workFor = val('workDoneFor');
+    const bufferFeet = parseInt(val('locateBuffer') || '20',10) || 0;
+
+    const sections = items.map((item,index)=>{
+      const workArea = Logic.cleanAcrossStreetAddressPairName(Logic.formatWorkAreaName(item) || item.location || 'Work area needs review');
+
+      let intersection = Logic.normalizeIntersectionForUse(item.nearestIntersection || '');
+      if(Logic.isAcrossStreetAddressPair(item.location) || Logic.isAcrossStreetAddressPair(item.nearestIntersection)) intersection = '';
+      if(!intersection && Logic.isIntersectionLocate(item)) intersection = Logic.normalizeIntersectionForUse(item.location || '');
+      if(!intersection) intersection = 'Nearest intersection needs review';
+
+      let instruction = '';
+      let gpsText = '';
+
+      if(Logic.isIntersectionLocate(item)){
+        instruction = this.buildIntersectionInstructions(item);
+        gpsText = this.buildIntersectionGpsText(item);
+      }else{
+        instruction = 'Need all utilities located at ' + workArea + ' across roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
+        if(item.sideOfRoad === 'Across Street'){
+          instruction = 'Need all utilities located at ' + workArea + ' across both sides of roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
+        }
+        instruction += ' We will be injecting polyurethane foam beneath the roadway to level and stabilize concrete.';
+        gpsText = this.buildNormalGpsText(item,bufferFeet);
+      }
+
+      const footer = Logic.isIntersectionLocate(item)
+        ? 'Intersection locate uses 100 ft limits in each direction from center GPS.'
+        : 'Roadway GPS uses road-offset projection when enabled, plus ' + bufferFeet + ' ft buffer before and after work limits.';
+
+      return (index+1) + '. WORK AREA\n' +
+        workArea + '\n\n' +
+        'NEAREST INTERSECTION\n' +
+        intersection + '\n\n' +
+        'WORK SITE LOCATE INSTRUCTIONS\n' +
+        instruction + '\n\n' +
+        'SUPPORTING GPS\n' +
+        gpsText + '\n' +
+        footer;
+    }).join('\n\n--------------------------------\n\n');
+
+    return 'TEXAS811 LOCATE REQUEST\n\n' +
+      'CITY: ' + city + '\n' +
+      'COUNTY: ' + county + '\n' +
+      'WORK FOR: ' + workFor + '\n' +
+      'ZONE: ' + zone + '\n\n' +
+      sections;
+  },
+
+  selected(){
+    const zone = val('zoneSelect');
+    const items = App.locations.filter(item => (item.zone || 'Unassigned') === zone);
+
+    if(!items.length){
+      App.generatedLocateText = '';
+      updateLocatePreview();
+      setCopyStatus('No locations found for selected zone.');
+      return;
+    }
+
+    App.generatedLocateText = this.buildZone(zone,items);
+    updateLocatePreview();
+    setCopyStatus('Generated locate text for selected zone.');
+    switchTab(3);
+  },
+
+  all(){
+    if(!App.locations.length){
+      App.generatedLocateText = '';
+      updateLocatePreview();
+      setCopyStatus('No locations extracted yet.');
+      showToast('No locations extracted yet.','warning');
+      return;
+    }
+
+    const zones = [...new Set(App.locations.map(item => item.zone || 'Unassigned'))];
+
+    App.generatedLocateText = zones.map(zone=>{
+      const items = App.locations.filter(item => (item.zone || 'Unassigned') === zone);
+      return this.buildZone(zone,items);
+    }).join('\n\n------------------------------\n\n');
+
+    updateLocatePreview();
+    setCopyStatus('Generated ' + zones.length + ' zone(s).');
+    switchTab(3);
+  },
+
+  copy(){
+    if(!App.generatedLocateText){
+      showToast('Generate locate wording first.','warning');
+      return;
+    }
+
+    navigator.clipboard.writeText(App.generatedLocateText).then(()=>{
+      showToast('Locate text copied.','success');
+    });
+  }
+};
+
+/* ============================================================
+   UI / render module
+   ============================================================ */
+
+const UI = {
+  renderAll(){
+    this.renderStats();
+    this.renderLocationTable();
+    this.renderLocationCards();
+    this.renderZoneSelect();
+    updateLocatePreview();
+  },
+
+  statusFor(item){
+    if(Logic.isIntersectionLocate(item) && item.gpsStart) return 'Intersection GPS Ready';
+    if(Logic.needsPropertyEndpointReview(item)) return 'Needs 2 GPS Points';
+    if(item.gpsStart && item.gpsEnd) return 'GPS Ready';
+    if(item.gpsStart) return 'GPS Partial';
+    return 'Draft';
+  },
+
+  renderStats(){
+    const count = App.locations.length;
+    const zones = new Set(App.locations.map(item=>item.zone || 'Unassigned')).size;
+    const gpsReady = App.locations.filter(item=>{
+      const status = this.statusFor(item);
+      return status === 'GPS Ready' || status === 'Intersection GPS Ready';
+    }).length;
+
+    if(el('statCount')) el('statCount').textContent = count;
+    if(el('statZones')) el('statZones').textContent = count ? zones : 0;
+    if(el('statGps')) el('statGps').textContent = gpsReady + ' / ' + count;
+  },
+
+  renderZoneSelect(){
+    const select = el('zoneSelect');
+    if(!select) return;
+
+    const zones = [...new Set(App.locations.map(item=>item.zone || 'Unassigned'))];
+
+    if(!zones.length){
+      select.innerHTML = '<option value="">(No Zones Extracted)</option>';
+      return;
+    }
+
+    select.innerHTML = zones.map(zone=>'<option value="' + escapeHtml(zone) + '">' + escapeHtml(zone) + '</option>').join('');
+  },
+
+  renderLocationTable(){
+    const body = el('locationsTableBody');
+    if(!body) return;
+
+    if(!App.locations.length){
+      body.innerHTML = '<tr><td colspan="12" class="text-center py-8 text-slate-400 italic">No locations configured yet.</td></tr>';
+      return;
+    }
+
+    body.innerHTML = App.locations.map((item,index)=>{
+      const status = this.statusFor(item);
+      const ok = status === 'GPS Ready' || status === 'Intersection GPS Ready';
+      return `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.zone)}" data-field="zone" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.location)}" data-field="location" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.nearestIntersection)}" data-field="nearestIntersection" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.startPoint)}" data-field="startPoint" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.endPoint)}" data-field="endPoint" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs" value="${escapeHtml(item.linearFeet)}" data-field="linearFeet" data-index="${index}"></td>
+          <td class="p-3">
+            <select class="input-base text-xs bg-white" data-field="sideOfRoad" data-index="${index}">
+              ${['Both Sides','North Side','South Side','East Side','West Side','Across Street'].map(opt=>'<option '+(item.sideOfRoad===opt?'selected':'')+'>'+opt+'</option>').join('')}
+            </select>
+          </td>
+          <td class="p-3">
+            <select class="input-base text-xs bg-white" data-field="roadOffsetSide" data-index="${index}">
+              ${['right','left','none'].map(opt=>'<option value="'+opt+'" '+((item.roadOffsetSide||'right')===opt?'selected':'')+'>'+opt+'</option>').join('')}
+            </select>
+          </td>
+          <td class="p-3"><input class="input-base text-xs monospace-font" value="${escapeHtml(item.gpsStart)}" data-field="gpsStart" data-index="${index}"></td>
+          <td class="p-3"><input class="input-base text-xs monospace-font" value="${escapeHtml(item.gpsEnd)}" data-field="gpsEnd" data-index="${index}"></td>
+          <td class="p-3"><span class="px-2 py-1 rounded-full text-[10px] font-black ${ok?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}">${escapeHtml(status)}</span></td>
+          <td class="p-3 text-center"><button class="text-rose-600 hover:text-rose-800 font-bold" data-action="remove" data-index="${index}"><i class="fa-solid fa-trash"></i></button></td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderLocationCards(){
+    const container = el('activeLocationList');
+    if(!container) return;
+
+    if(!App.locations.length){
+      container.innerHTML = '<div class="text-center py-8 text-slate-400 text-xs italic">No active locations yet.</div>';
+      return;
+    }
+
+    container.innerHTML = App.locations.map((item,index)=>{
+      const status = this.statusFor(item);
+      return `
+        <button class="w-full text-left bg-white border border-slate-200 rounded-xl p-3 hover:border-kke-blue hover:shadow-sm transition-all" data-action="focus" data-index="${index}">
+          <div class="flex justify-between gap-2">
+            <span class="font-bold text-slate-800 text-xs">#${index+1} ${escapeHtml(item.location)}</span>
+            <span class="text-[10px] font-bold text-kke-blue">${escapeHtml(item.zone || 'Unassigned')}</span>
+          </div>
+          <div class="text-[11px] text-slate-500 mt-1">${escapeHtml(item.nearestIntersection || 'Intersection needs review')}</div>
+          <div class="text-[10px] text-slate-400 mt-1">${escapeHtml(status)}</div>
+        </button>
+      `;
+    }).join('');
+  },
+
+  updateField(index,field,value){
+    if(!App.locations[index]) return;
+    App.locations[index][field] = value;
+
+    if(field === 'location'){
+      const parsed = Logic.deriveStartEndFromLocation(value);
+      App.locations[index].startPoint = parsed.start;
+      App.locations[index].endPoint = parsed.end;
+      if(!App.locations[index].nearestIntersection) App.locations[index].nearestIntersection = Logic.guessIntersection(value);
+    }
+
+    this.renderAll();
+    MapModule.draw();
+  },
+
+  addManual(){
+    App.locations.push({
+      id:String(Date.now()),
+      zone:'Unassigned',
+      location:'',
+      county:val('county'),
+      methodTypes:['Method'],
+      dimensions:'',
+      notes:'',
+      nearestIntersection:'',
+      driveFrom:'',
+      driveFromGps:'',
+      distanceToBeginFeet:'',
+      routeDirections:'',
+      startPoint:'',
+      endPoint:'',
+      direction:'',
+      linearFeet:'',
+      locateWidth:'15 ft each side of work area',
+      sideOfRoad:'Both Sides',
+      gpsStart:'',
+      gpsEnd:'',
+      roadOffsetSide:val('defaultOffsetSide') || 'right',
+      status:'Draft'
+    });
+    this.renderAll();
+  },
+
+  remove(index){
+    App.locations.splice(index,1);
+    this.renderAll();
+    MapModule.draw();
+  },
+
+  clear(){
+    App.locations = [];
+    App.generatedLocateText = '';
+    if(el('estimateText')) el('estimateText').value = '';
+    clearGpsLog();
+    this.renderAll();
+    MapModule.draw();
+    setCopyStatus('No locate text generated yet.');
+  },
+
+  save(){
+    const payload = {
+      fields:{
+        projectName:val('projectName'),
+        city:val('city'),
+        county:val('county'),
+        poNumber:val('poNumber'),
+        workDoneFor:val('workDoneFor'),
+        duration:val('duration'),
+        locateBuffer:val('locateBuffer'),
+        roadOffsetFeet:val('roadOffsetFeet'),
+        defaultOffsetSide:val('defaultOffsetSide'),
+        googleApiKey:val('googleApiKey'),
+        estimateText:val('estimateText')
+      },
+      locations:App.locations
+    };
+    localStorage.setItem('kkeLocateBuilder:stableProject',JSON.stringify(payload));
+    showToast('Project saved locally.','success');
+  },
+
+  load(){
+    const raw = localStorage.getItem('kkeLocateBuilder:stableProject');
+    if(!raw){ showToast('No saved project found.','warning'); return; }
+    const payload = JSON.parse(raw);
+    Object.keys(payload.fields || {}).forEach(key=>setVal(key,payload.fields[key] || ''));
+    App.locations = Array.isArray(payload.locations) ? payload.locations : [];
+    this.renderAll();
+    MapModule.draw();
+    showToast('Project loaded.','success');
+  },
+
+  downloadCsv(){
+    if(!App.locations.length){ showToast('No locations to download.','warning'); return; }
+
+    const headers = ['Zone','Location','Intersection','Start','End','LF','Side','Road Offset','GPS Start','GPS End','Status'];
+    const rows = App.locations.map(item=>[
+      item.zone,item.location,item.nearestIntersection,item.startPoint,item.endPoint,item.linearFeet,item.sideOfRoad,item.roadOffsetSide,item.gpsStart,item.gpsEnd,this.statusFor(item)
+    ]);
+
+    const csv = [headers,...rows].map(row=>row.map(cell=>'"'+String(cell || '').replace(/"/g,'""')+'"').join(',')).join('\n');
+    const blob = new Blob([csv],{type:'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'kke-locate-builder.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  },
+
+  runCheck(){
+    const results = [];
+    results.push(typeof Parser.parse === 'function' ? '✅ Parser loaded' : '❌ Parser missing');
+    results.push(typeof Packet.all === 'function' ? '✅ Generate All Zones loaded' : '❌ Generate All Zones missing');
+    results.push(typeof Logic.buildRoadAdjustedBufferedGps === 'function' ? '✅ Road offset/buffer loaded' : '❌ Road offset/buffer missing');
+    results.push(typeof Logic.isIntersectionLocate === 'function' ? '✅ Intersection logic loaded' : '❌ Intersection logic missing');
+
+    const oldText = val('estimateText');
+    const oldLocations = JSON.parse(JSON.stringify(App.locations));
+
+    setVal('estimateText',SAMPLE_TEXT);
+    Parser.parse();
+    const parsedCount = App.locations.length;
+    Packet.all();
+    const outputOk = App.generatedLocateText.includes('TEXAS811 LOCATE REQUEST');
+
+    results.push(parsedCount >= 8 ? '✅ Sample parse passed: '+parsedCount+' locations' : '❌ Sample parse failed: '+parsedCount+' locations');
+    results.push(outputOk ? '✅ Generate All Zones passed' : '❌ Generate All Zones failed');
+
+    setVal('estimateText',oldText);
+    App.locations = oldLocations;
+    App.generatedLocateText = results.join('\n');
+    this.renderAll();
+    updateLocatePreview();
+    switchTab(3);
+  }
+};
+
+/* ============================================================
+   Map module
+   ============================================================ */
+
+const MapModule = {
+  init(){
+    if(typeof L === 'undefined') return;
+    if(App.map){
+      App.map.invalidateSize();
+      this.draw();
+      return;
+    }
+
+    App.map = L.map('map',{ center:[33.0886,-96.8872], zoom:14 });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution:'&copy; OpenStreetMap contributors' }).addTo(App.map);
+    this.draw();
+  },
+
+  clear(){
+    if(!App.map) return;
+    App.mapLayers.markers.forEach(layer=>App.map.removeLayer(layer));
+    App.mapLayers.polylines.forEach(layer=>App.map.removeLayer(layer));
+    App.mapLayers.circles.forEach(layer=>App.map.removeLayer(layer));
+    App.mapLayers = { markers:[], polylines:[], circles:[] };
+  },
+
+  draw(){
+    if(!App.map) return;
+    this.clear();
+    const bounds = [];
+
+    App.locations.forEach((item,index)=>{
+      const start = Logic.parseLatLng(item.gpsStart);
+      const end = Logic.parseLatLng(item.gpsEnd);
+      const isIntersection = Logic.isIntersectionLocate(item);
+
+      if(start){
+        bounds.push([start.lat,start.lng]);
+        const marker = L.marker([start.lat,start.lng],{ draggable:true, title:'Location #'+(index+1)+' Start/Center' }).addTo(App.map);
+        marker.on('dragend',e=>{
+          const pos = e.target.getLatLng();
+          UI.updateField(index,'gpsStart',pos.lat.toFixed(6)+','+pos.lng.toFixed(6));
+          showToast('Updated start/center GPS from map.','success');
+        });
+        marker.bindPopup('<strong>#'+(index+1)+' '+escapeHtml(item.location)+'</strong><br>Start / Center GPS<br>'+escapeHtml(item.gpsStart));
+        App.mapLayers.markers.push(marker);
+
+        if(isIntersection){
+          const circle = L.circle([start.lat,start.lng],{ color:'#d97706', fillColor:'#f59e0b', fillOpacity:.14, radius:30.48 }).addTo(App.map);
+          App.mapLayers.circles.push(circle);
+        }
+      }
+
+      if(end && !isIntersection){
+        bounds.push([end.lat,end.lng]);
+        const marker = L.marker([end.lat,end.lng],{ draggable:true, title:'Location #'+(index+1)+' End' }).addTo(App.map);
+        marker.on('dragend',e=>{
+          const pos = e.target.getLatLng();
+          UI.updateField(index,'gpsEnd',pos.lat.toFixed(6)+','+pos.lng.toFixed(6));
+          showToast('Updated end GPS from map.','success');
+        });
+        marker.bindPopup('<strong>#'+(index+1)+' '+escapeHtml(item.location)+'</strong><br>End GPS<br>'+escapeHtml(item.gpsEnd));
+        App.mapLayers.markers.push(marker);
+      }
+
+      if(start && end && !isIntersection){
+        const baseLine = L.polyline([[start.lat,start.lng],[end.lat,end.lng]],{ color:'#0057a8', weight:4, opacity:.75 }).addTo(App.map);
+        App.mapLayers.polylines.push(baseLine);
+
+        const adjusted = Logic.buildRoadAdjustedBufferedGps(item,parseInt(val('locateBuffer') || '20',10) || 0);
+        const adjStart = Logic.parseLatLng(adjusted.start);
+        const adjEnd = Logic.parseLatLng(adjusted.end);
+
+        if(adjStart && adjEnd){
+          const bufferLine = L.polyline([[adjStart.lat,adjStart.lng],[adjEnd.lat,adjEnd.lng]],{ color:'#f57c00', weight:12, opacity:.35, dashArray:'8, 8' }).addTo(App.map);
+          App.mapLayers.polylines.push(bufferLine);
+        }
+      }
+    });
+
+    if(bounds.length > 0){
+      App.map.fitBounds(bounds,{ padding:[50,50], maxZoom:16 });
+    }
+  },
+
+  focus(index){
+    if(!App.map || !App.locations[index]) return;
+    const point = Logic.parseLatLng(App.locations[index].gpsStart);
+    if(point) App.map.setView([point.lat,point.lng],16);
+  }
+};
+
+/* ============================================================
+   File / PDF module
+   ============================================================ */
+
+async function handlePdfUpload(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+
+  if(!window.pdfjsLib){
+    showToast('PDF parser failed to load.','error');
+    return;
+  }
+
+  try{
+    if(pdfjsLib.GlobalWorkerOptions){
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data:buffer }).promise;
+    let text = '';
+
+    for(let pageNumber=1; pageNumber<=pdf.numPages; pageNumber++){
+      const page = await pdf.getPage(pageNumber);
+      const content = await page.getTextContent();
+      text += '\n\n--- PAGE ' + pageNumber + ' ---\n' + content.items.map(item=>item.str).join(' ');
+    }
+
+    setVal('estimateText',text.trim());
+    Parser.parse();
+  }catch(error){
+    console.error(error);
+    showToast('PDF extraction failed. Paste text instead.','error');
+  }
+}
+
+/* ============================================================
+   Global bindings / compatibility wrappers
+   ============================================================ */
+
+function parseEstimate(){ Parser.parse(); }
+function loadTributeExample(){ setVal('estimateText',SAMPLE_TEXT); Parser.parse(); }
+function generateAllZones(){ Packet.all(); }
+function generateLocateForSelectedZone(){ Packet.selected(); }
+function copyLocateText(){ Packet.copy(); }
+function generateCoordinatesForAll(){ GPS.generateAll(); }
+function autoAssignZones(){ Logic.autoAssignZones(true); }
+function addManualRow(){ UI.addManual(); }
+function downloadCsv(){ UI.downloadCsv(); }
+
+window.parseEstimate = parseEstimate;
+window.loadTributeExample = loadTributeExample;
+window.generateAllZones = generateAllZones;
+window.generateLocateForSelectedZone = generateLocateForSelectedZone;
+window.copyLocateText = copyLocateText;
+window.generateCoordinatesForAll = generateCoordinatesForAll;
+window.autoAssignZones = autoAssignZones;
+window.addManualRow = addManualRow;
+window.downloadCsv = downloadCsv;
+window.handlePdfUpload = handlePdfUpload;
+
+/* ============================================================
+   Event listeners
+   ============================================================ */
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('[data-tab]').forEach(button=>{
+    button.addEventListener('click',()=>switchTab(Number(button.dataset.tab)));
+  });
+
+  const ids = {
+    extractBtn:()=>Parser.parse(),
+    sampleBtn:()=>{ setVal('estimateText',SAMPLE_TEXT); Parser.parse(); },
+    clearBtn:()=>UI.clear(),
+    saveBtn:()=>UI.save(),
+    loadBtn:()=>UI.load(),
+    gpsBtn:()=>GPS.generateAll(),
+    mockGpsBtn:()=>GPS.mock(),
+    manualBtn:()=>UI.addManual(),
+    zoneBtn:()=>Logic.autoAssignZones(true),
+    csvBtn:()=>UI.downloadCsv(),
+    genSelectedBtn:()=>Packet.selected(),
+    genAllBtn:()=>Packet.all(),
+    copyBtn:()=>Packet.copy(),
+    appCheckBtn:()=>UI.runCheck(),
+    intersectionBtn:()=>showToast('Intersection suggestions are already handled during parsing/geocoding.','info')
+  };
+
+  Object.keys(ids).forEach(id=>{
+    const node = el(id);
+    if(node) node.addEventListener('click',ids[id]);
+  });
+
+  const pdfUpload = el('pdfUpload');
+  if(pdfUpload) pdfUpload.addEventListener('change',handlePdfUpload);
+
+  const tableBody = el('locationsTableBody');
+  if(tableBody){
+    tableBody.addEventListener('input',event=>{
+      const target = event.target;
+      if(target.dataset && target.dataset.field){
+        UI.updateField(Number(target.dataset.index),target.dataset.field,target.value);
+      }
+    });
+
+    tableBody.addEventListener('change',event=>{
+      const target = event.target;
+      if(target.dataset && target.dataset.field){
+        UI.updateField(Number(target.dataset.index),target.dataset.field,target.value);
+      }
+    });
+
+    tableBody.addEventListener('click',event=>{
+      const button = event.target.closest('[data-action]');
+      if(!button) return;
+      const index = Number(button.dataset.index);
+      if(button.dataset.action === 'remove') UI.remove(index);
+    });
+  }
+
+  const activeList = el('activeLocationList');
+  if(activeList){
+    activeList.addEventListener('click',event=>{
+      const button = event.target.closest('[data-action="focus"]');
+      if(button) MapModule.focus(Number(button.dataset.index));
+    });
+  }
+
+  ['locateBuffer','roadOffsetFeet','defaultOffsetSide'].forEach(id=>{
+    const node = el(id);
+    if(node) node.addEventListener('change',()=>{ UI.renderAll(); MapModule.draw(); });
+  });
+
+  UI.renderAll();
+});
+</script>
+</body>
+</html>

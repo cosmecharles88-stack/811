@@ -156,7 +156,7 @@
         <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl text-xs space-y-2">
           <span class="font-bold text-slate-700 block">Stable Business Logic</span>
           <ul class="space-y-1.5 text-slate-600 list-disc list-inside">
-            <li>Same exact Method/DI heading merges into one locate.</li>
+            <li>Only 4 work zones are used for organization.</li><li>Each separate job/location inside a zone generates its own locate request.</li><li>Same exact Method/DI heading merges into one job.</li>
             <li>Separated addresses remain separate locate areas.</li>
             <li>Intersection locates use one center GPS and 100 ft each direction.</li>
             <li>Address/frontage locates require start/end GPS endpoints.</li>
@@ -1167,56 +1167,57 @@ const Packet = {
     return 'GPS needs review. Generate GPS coordinates or manually enter START and END GPS points before submission.';
   },
 
-  buildZone(zone,items){
+  buildJob(zone,item,jobIndex,totalJobs){
     const city = val('city');
     const county = val('county');
     const workFor = val('workDoneFor');
     const bufferFeet = parseInt(val('locateBuffer') || '20',10) || 0;
 
-    const sections = items.map((item,index)=>{
-      const workArea = Logic.cleanAcrossStreetAddressPairName(Logic.formatWorkAreaName(item) || item.location || 'Work area needs review');
+    const workArea = Logic.cleanAcrossStreetAddressPairName(Logic.formatWorkAreaName(item) || item.location || 'Work area needs review');
 
-      let intersection = Logic.normalizeIntersectionForUse(item.nearestIntersection || '');
-      if(Logic.isAcrossStreetAddressPair(item.location) || Logic.isAcrossStreetAddressPair(item.nearestIntersection)) intersection = '';
-      if(!intersection && Logic.isIntersectionLocate(item)) intersection = Logic.normalizeIntersectionForUse(item.location || '');
-      if(!intersection) intersection = 'Nearest intersection needs review';
+    let intersection = Logic.normalizeIntersectionForUse(item.nearestIntersection || '');
+    if(Logic.isAcrossStreetAddressPair(item.location) || Logic.isAcrossStreetAddressPair(item.nearestIntersection)) intersection = '';
+    if(!intersection && Logic.isIntersectionLocate(item)) intersection = Logic.normalizeIntersectionForUse(item.location || '');
+    if(!intersection) intersection = 'Nearest intersection needs review';
 
-      let instruction = '';
-      let gpsText = '';
+    let instruction = '';
+    let gpsText = '';
 
-      if(Logic.isIntersectionLocate(item)){
-        instruction = this.buildIntersectionInstructions(item);
-        gpsText = this.buildIntersectionGpsText(item);
-      }else{
-        instruction = 'Need all utilities located at ' + workArea + ' across roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
-        if(item.sideOfRoad === 'Across Street'){
-          instruction = 'Need all utilities located at ' + workArea + ' across both sides of roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
-        }
-        instruction += ' We will be injecting polyurethane foam beneath the roadway to level and stabilize concrete.';
-        gpsText = this.buildNormalGpsText(item,bufferFeet);
+    if(Logic.isIntersectionLocate(item)){
+      instruction = this.buildIntersectionInstructions(item);
+      gpsText = this.buildIntersectionGpsText(item);
+    }else{
+      instruction = 'Need all utilities located at ' + workArea + ' within roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
+      if(item.sideOfRoad === 'Across Street'){
+        instruction = 'Need all utilities located at ' + workArea + ' across both sides of the roadway, including roadway panels, curb line, sidewalk, and adjacent right-of-way areas.';
       }
+      instruction += ' We will be injecting polyurethane foam beneath the roadway to level and stabilize concrete.';
+      gpsText = this.buildNormalGpsText(item,bufferFeet);
+    }
 
-      const footer = Logic.isIntersectionLocate(item)
-        ? 'Intersection locate uses 100 ft limits in each direction from center GPS.'
-        : 'Roadway GPS uses road-offset projection when enabled, plus ' + bufferFeet + ' ft buffer before and after work limits.';
-
-      return (index+1) + '. WORK AREA\n' +
-        workArea + '\n\n' +
-        'NEAREST INTERSECTION\n' +
-        intersection + '\n\n' +
-        'WORK SITE LOCATE INSTRUCTIONS\n' +
-        instruction + '\n\n' +
-        'SUPPORTING GPS\n' +
-        gpsText + '\n' +
-        footer;
-    }).join('\n\n--------------------------------\n\n');
+    const footer = Logic.isIntersectionLocate(item)
+      ? 'Intersection locate uses 100 ft limits in each direction from center GPS.'
+      : 'Roadway GPS uses road-offset projection when enabled, plus ' + bufferFeet + ' ft buffer before and after work limits.';
 
     return 'TEXAS811 LOCATE REQUEST\n\n' +
       'CITY: ' + city + '\n' +
       'COUNTY: ' + county + '\n' +
       'WORK FOR: ' + workFor + '\n' +
-      'ZONE: ' + zone + '\n\n' +
-      sections;
+      'WORK ZONE: ' + zone + '\n' +
+      'SEPARATE JOB: ' + jobIndex + ' of ' + totalJobs + '\n\n' +
+      'WORK AREA\n' +
+      workArea + '\n\n' +
+      'NEAREST INTERSECTION\n' +
+      intersection + '\n\n' +
+      'WORK SITE LOCATE INSTRUCTIONS\n' +
+      instruction + '\n\n' +
+      'SUPPORTING GPS / ADDITIONAL INFO\n' +
+      gpsText + '\n' +
+      footer;
+  },
+
+  buildZone(zone,items){
+    return items.map((item,index)=>this.buildJob(zone,item,index+1,items.length)).join('\n\n==============================\n\n');
   },
 
   selected(){
@@ -1232,7 +1233,7 @@ const Packet = {
 
     App.generatedLocateText = this.buildZone(zone,items);
     updateLocatePreview();
-    setCopyStatus('Generated locate text for selected zone.');
+    setCopyStatus('Generated ' + items.length + ' separate job(s) for selected zone.');
     switchTab(3);
   },
 
@@ -1249,11 +1250,11 @@ const Packet = {
 
     App.generatedLocateText = zones.map(zone=>{
       const items = App.locations.filter(item => (item.zone || 'Unassigned') === zone);
-      return this.buildZone(zone,items);
-    }).join('\n\n------------------------------\n\n');
+      return '########## ' + zone + ' ##########\n\n' + this.buildZone(zone,items);
+    }).join('\n\n\n########################################\n########################################\n\n\n');
 
     updateLocatePreview();
-    setCopyStatus('Generated ' + zones.length + ' zone(s).');
+    setCopyStatus('Generated ' + zones.length + ' work zone(s), with each separate job handled separately.');
     switchTab(3);
   },
 
@@ -1268,6 +1269,8 @@ const Packet = {
     });
   }
 };
+
+
 
 /* ============================================================
    UI / render module
